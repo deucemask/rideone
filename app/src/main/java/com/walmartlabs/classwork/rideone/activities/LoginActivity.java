@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -18,11 +19,15 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.parse.LogInCallback;
+import com.parse.GetCallback;
 import com.parse.ParseException;
+import com.parse.ParseQuery;
 import com.parse.ParseUser;
 import com.walmartlabs.classwork.rideone.R;
+import com.walmartlabs.classwork.rideone.models.User;
 import com.walmartlabs.classwork.rideone.util.Utils;
+
+import static com.walmartlabs.classwork.rideone.models.User.COLUMN_LOGIN_USER_ID;
 
 /**
  * A login screen that offers login via email/password.
@@ -83,15 +88,35 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void checkLogin() {
-        if (ParseUser.getCurrentUser() != null) { // start with existing user
-            loginSuccess();
+        ParseUser user = ParseUser.getCurrentUser();
+        if (user != null) { // start with existing user
+            loginSuccess(user);
         }
     }
 
-    private void loginSuccess() {
+    private void loginSuccess(ParseUser loginUser) {
         clearErrors();
-        Intent i = new Intent(this, HomeActivity.class);
-        startActivity(i);
+        ParseQuery<User> query = ParseQuery.getQuery(User.class);
+        final String loginUserId = loginUser.getObjectId();
+        query.whereEqualTo(COLUMN_LOGIN_USER_ID, loginUserId);
+        query.getFirstInBackground(new GetCallback<User>() {
+            @Override
+            public void done(User user, ParseException e) {
+                if (e != null) {
+                    Log.e(LoginActivity.class.getSimpleName(), "Failed to get user for loginUserId " + loginUserId, e);
+                    Toast.makeText(LoginActivity.this, "User credentials error", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                Intent i = new Intent(LoginActivity.this, HomeActivity.class);
+                //ParseFile not serializble. so remove profileimage and fetch it in the next activity
+                user.remove("profileImage");
+                user.flush();
+                i.putExtra("user", user);
+
+                startActivity(i);
+            }
+        });
     }
 
 
@@ -100,6 +125,7 @@ public class LoginActivity extends AppCompatActivity {
      * If there are form errors (invalid email, missing fields, etc.), the
      * errors are presented and no actual login attempt is made.
      */
+
     private void attemptLogin() {
         if (mAuthTask != null) {
             return;
@@ -192,7 +218,7 @@ public class LoginActivity extends AppCompatActivity {
      * Represents an asynchronous login/registration task used to authenticate
      * the user.
      */
-    public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
+    public class UserLoginTask extends AsyncTask<Void, Void, ParseUser> {
 
         private final String userName;
         private final String password;
@@ -203,30 +229,25 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         @Override
-        protected Boolean doInBackground(Void... params) {
-            final boolean[] success = {true};
-            ParseUser.logInInBackground(userName, password, new LogInCallback() {
-                public void done(ParseUser user, ParseException e) {
-                    if (user != null) {
-                        // Hooray! The user is logged in.
-                    } else {
-                        // Signup failed. Look at the ParseException to see what happened.
-                        e.printStackTrace();
-                        success[0] = false;
-                    }
-                }
-            });
-            return success[0];
+        protected ParseUser doInBackground(Void... params) {
+            ParseUser user = null;
+            try {
+                user = ParseUser.logIn(userName, password);
+            } catch (ParseException e) {
+                e.printStackTrace();
+                user = null;
+            }
+            return user;
         }
 
         @Override
-        protected void onPostExecute(final Boolean success) {
+        protected void onPostExecute(final ParseUser successUser) {
             mAuthTask = null;
             showProgress(false);
 
-            if (success && ParseUser.getCurrentUser() != null) {
+            if (successUser != null) {
                 Toast.makeText(LoginActivity.this, "Login succesful : " + ParseUser.getCurrentUser().getUsername(), Toast.LENGTH_SHORT).show();
-                loginSuccess();
+                loginSuccess(successUser);
             } else {
                 edUserName.setError(getString(R.string.error_incorrect_password));
                 mPasswordView.setError(getString(R.string.error_incorrect_password));

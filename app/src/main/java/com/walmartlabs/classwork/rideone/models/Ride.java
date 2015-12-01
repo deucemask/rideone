@@ -1,72 +1,146 @@
 package com.walmartlabs.classwork.rideone.models;
 
-import android.os.Parcel;
-import android.os.Parcelable;
-
+import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 import com.parse.ParseClassName;
 import com.parse.ParseObject;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
- * Created by abalak5 on 11/8/15.
+ * Created by dmaskev on 11/8/15.
  */
 @ParseClassName("Ride")
-public class Ride extends ParseObject implements Parcelable {
+public class Ride extends ParseObject implements CustomSerializable<Ride> {
+    public static final String COLUMN_AVAILABLE = "available";
+    public static final String COLUMN_DATE = "date";
+    public static final String COLUMN_START_LOCATION = "start_loc";
+    public static final String COLUMN_DESTINATION = "destination";
+    public static final String COLUMN_SPOTS = "spots";
+    public static final String COLUMN_DRIVER = "driver_id";
+    public static final String COLUMN_RIDERS = "riderIds";
+    public static final String COLUMN_SPOTS_LEFT = "spotsLeft";
 
-    public Ride(){}
+    private User driver;
+    private Map<String, Object> fields = new HashMap<>();
 
-    public int getTotalSpots() {
-        return getInt("totalSpots");
+    @Override
+    public Map<String, Object> getFields() {
+        return this.fields;
     }
 
-    public void setTotalSpots(int totalSpots) {
-        put("totalSpots", totalSpots);
+
+    @Override
+    public Ride flush() {
+        for(String key : keySet()) {
+            fields.put(key, get(key));
+        }
+
+        fields.put("objectId", getObjectId());
+        return this;
     }
 
-    public String getMake() {
-        return getString("make");
-    }
+    public static ArrayList<Ride> flushArray(List<Ride> rides) {
+        ArrayList<Ride> res = new ArrayList<>(rides.size());
+        for(Ride ride : rides) {
+            res.add(ride.flush());
+        }
 
-    public void setMake(String make) {
-        put("make", make);
-    }
-
-    public String getModel() {
-        return getString("model");
-    }
-
-    public void setModel(String model) {
-        put("model", model);
-    }
-
-    public String getLicense() {
-        return getString("license");
-    }
-
-    public void setLicense(String license) {
-        put("license", license);
+        return res;
     }
 
     @Override
-    public int describeContents() {
-        return 0;
-    }
+    public Ride rebuild() {
+        String objectId = fields.get("objectId").toString();
+        Ride model = Ride.createWithoutData(Ride.class, objectId);
 
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
-    }
-
-    protected Ride(Parcel in) {
-    }
-
-    public static final Creator<Ride> CREATOR = new Creator<Ride>() {
-        @Override
-        public Ride createFromParcel(Parcel in) {
-            return new Ride(in);
+        for (Map.Entry<String, Object> entry : fields.entrySet()) {
+            Object value = entry.getValue();
+            model.put(entry.getKey(), value);
         }
 
-        @Override
-        public Ride[] newArray(int size) {
-            return new Ride[size];
+        return model;
+    }
+
+
+    public int getSpots() {
+        return getInt(COLUMN_SPOTS);
+    }
+
+    public void setSpots(int spots) {
+        put(COLUMN_SPOTS, spots);
+    }
+
+    public boolean isAvailable() {
+        return getBoolean(COLUMN_AVAILABLE);
+    }
+
+    public void setAvailable(boolean available) {
+        put(COLUMN_AVAILABLE, available);
+    }
+
+    public Date getDate() {
+        return getDate(COLUMN_DATE);
+    }
+
+    public void setDate(Date date) {
+        put(COLUMN_DATE, date);
+    }
+
+    public String getStartLocation() {
+        return getString(COLUMN_START_LOCATION);
+    }
+
+    public void setStartLocation(String startLocation) {
+        put(COLUMN_START_LOCATION, startLocation);
+    }
+
+    public String getDestination() {
+        return getString(COLUMN_DESTINATION);
+    }
+
+    public void setDestination(String destination) {
+        put(COLUMN_DESTINATION, destination);
+    }
+
+    public void setRiderIds(List<String> riders) {
+        put(COLUMN_RIDERS, Joiner.on(',').join(riders));
+    }
+    public List<String> getRiderIds() {
+         String riderIds = getString(COLUMN_RIDERS);
+        if(Strings.isNullOrEmpty(riderIds)) {
+            return new ArrayList<>();
         }
-    };
+
+        return new ArrayList<String>(Arrays.asList(riderIds.split(",")));
+    }
+
+    public void setDriverId(String driverId) {
+        put(COLUMN_DRIVER, driverId);
+    }
+    public String getDriverId() {
+        return getString(COLUMN_DRIVER);
+    }
+
+    public void setDriver(User driver) {
+        this.driver = driver;
+    }
+
+    public User getDriver() {
+        return driver;
+    }
+
+    public int getSpotsLeft() {
+        return getInt(COLUMN_SPOTS_LEFT);
+    }
+
+    public void setSpotsLeft(int spotsLeft) {
+        put(COLUMN_SPOTS_LEFT, spotsLeft);
+    }
+
 }
